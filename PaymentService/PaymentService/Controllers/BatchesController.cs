@@ -23,14 +23,14 @@ namespace PaymentService.Controllers
         {
             try
             {
-                string headers = string.Empty;
-                foreach (var key in Request.Headers.Keys)
-                    headers += key + "=" + Request.Headers[key] + Environment.NewLine;
-
                 if (!ModelState.IsValid)
                 {
                     return BadRequest(ModelState);
                 }
+
+                var Token = HttpContext.Request.Headers["x-token"];
+                var CallbackToken = HttpContext.Request.Headers["x-callbacktoken"];
+                var CallbackTokenExpiration = HttpContext.Request.Headers["x-callbackexpire"];
 
                 await _batchService.ProcesseBatch(batch);
                 
