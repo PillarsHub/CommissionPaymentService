@@ -1,5 +1,6 @@
-﻿using Microsoft.OpenApi.Models;
-using PaymentService.Inerfaces;
+﻿using Microsoft.Extensions.Caching.Memory;
+using Microsoft.OpenApi.Models;
+using PaymentService.Interfaces;
 using PaymentService.Repositories;
 using PaymentService.Services;
 using System.Net.Http.Headers;
@@ -7,7 +8,7 @@ using System.Net.Http.Headers;
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 {
-    string bearerToken = Environment.GetEnvironmentVariable("ApiKey") ?? string.Empty;
+    string bearerToken = Environment.GetEnvironmentVariable("ApiKey") ?? builder.Configuration["ApiKey"] ?? String.Empty;
 
     builder.Services.AddHttpClient<IClient, Client>(c =>
     {
@@ -17,12 +18,19 @@ builder.Logging.ClearProviders();
     
     builder.Services.AddSingleton<IBatchService, BatchService>();
     builder.Services.AddSingleton<IBonusRepository, BonusRepository>();
-    
+    builder.Services.AddSingleton<ICustomerRepository, CustomerRepository>();
     builder.Services.AddControllers();
     builder.Services.AddSwaggerGen(c =>
     {
         c.SwaggerDoc("v1", new OpenApiInfo { Title = "Payment Processing Service", Version = "v1" });
     });
+
+    var config = new ConfigurationBuilder()
+        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+        .AddEnvironmentVariables()
+        .Build();
+
+    builder.Services.AddSingleton<IPayQuickerService>(_ => new PayQuickerService(builder.Configuration, new MemoryCache(new MemoryCacheOptions())));
 }
 
 var app = builder.Build();

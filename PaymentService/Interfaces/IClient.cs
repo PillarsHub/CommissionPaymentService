@@ -1,4 +1,4 @@
-﻿namespace PaymentService.Inerfaces
+﻿namespace PaymentService.Interfaces
 {
     public interface IClient
     {

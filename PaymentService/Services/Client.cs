@@ -1,4 +1,4 @@
-﻿using PaymentService.Inerfaces;
+﻿using PaymentService.Interfaces;
 using PaymentService.Services.Exceptions;
 
 namespace PaymentService.Services
@@ -14,7 +14,7 @@ namespace PaymentService.Services
             _commissionRootUrl = configuration.GetValue<string>("ApiUrl");
         }
 
-        private string GetRootUrl()
+        private string GetRootUrl() 
         {
             return _commissionRootUrl;
         }
@@ -66,6 +66,7 @@ namespace PaymentService.Services
         public async Task<T> Get<T>(string url)
         {
             var result = await _client.GetAsync(GetRootUrl() + url);
+            var temp = await result.Content.ReadAsStringAsync();
             return await ProcessResult<T>(result);
         }
 

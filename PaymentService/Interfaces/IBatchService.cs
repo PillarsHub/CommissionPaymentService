@@ -1,6 +1,6 @@
 ﻿using PaymentService.Models;
 
-namespace PaymentService.Inerfaces
+namespace PaymentService.Interfaces
 {
     public interface IBatchService
     {

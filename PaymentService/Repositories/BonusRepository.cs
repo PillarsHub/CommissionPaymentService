@@ -1,4 +1,4 @@
-﻿using PaymentService.Inerfaces;
+﻿using PaymentService.Interfaces;
 using PaymentService.Models;
 
 namespace PaymentService.Repositories
