@@ -28,7 +28,6 @@ namespace PaymentService.Controllers
                     return BadRequest(ModelState);
                 }
 
-                var Token = HttpContext.Request.Headers["x-token"];
                 var CallbackToken = HttpContext.Request.Headers["x-callbacktoken"];
                 var CallbackTokenExpiration = HttpContext.Request.Headers["x-callbackexpire"];
 
