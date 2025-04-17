@@ -1,11 +1,8 @@
-﻿using Newtonsoft.Json;
+﻿using Microsoft.Extensions.Caching.Memory;
+using PaymentService.Interfaces;
 using PaymentService.Models;
 using RestSharp;
 using RestSharp.Authenticators;
-using System.Net;
-using System.Security.AccessControl;
-using Microsoft.Extensions.Caching.Memory;
-using PaymentService.Interfaces;
 
 
 namespace PaymentService.Services

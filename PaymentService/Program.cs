@@ -4,6 +4,8 @@ using PaymentService.Interfaces;
 using PaymentService.Repositories;
 using PaymentService.Services;
 using System.Net.Http.Headers;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
@@ -43,16 +45,15 @@ var app = builder.Build();
     app.UseSwagger();
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Payment Processing Service v1"));
 
-    app.UseHttpsRedirection();
-
-    app.UseRouting();
-
-    app.UseAuthorization();
-
-    app.UseEndpoints(endpoints =>
+    app.MapGet("/", () =>
     {
-        endpoints.MapControllers();
+        var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "Unknown";
+        var runtimeVersion = RuntimeInformation.FrameworkDescription;
+
+        return $"Ver: {assemblyVersion}, Runtime: {runtimeVersion}";
     });
+
+    app.MapControllers();
 }
 
 app.Run();
