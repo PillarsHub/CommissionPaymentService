@@ -2,28 +2,34 @@
 using PaymentService.Models;
 using RestSharp;
 using RestSharp.Authenticators;
+using System;
 
 
 namespace PaymentService.Services
 {
     public class PayQuickerService : IPayQuickerService
     {
-        private string _IdentityUrl { get; set; } = string.Empty;
+        private string _LiveIdentityUrl { get; set; } = string.Empty;
         private string _LiveBaseUrl { get; set; } = string.Empty;
+
+        private string _SandboxIdentityUrl { get; set; } = string.Empty;
         private string _SandboxBaseUrl { get; set; } = string.Empty;
 
         public PayQuickerService()
         {
-            _IdentityUrl = Environment.GetEnvironmentVariable("IdentityUrl") ?? string.Empty;
+            _LiveIdentityUrl = Environment.GetEnvironmentVariable("LiveIdentityUrl") ?? string.Empty;
             _LiveBaseUrl = Environment.GetEnvironmentVariable("LiveBaseUrl") ?? string.Empty;
+
+            _SandboxIdentityUrl = Environment.GetEnvironmentVariable("SandboxIdentityUrl") ?? string.Empty;
             _SandboxBaseUrl = Environment.GetEnvironmentVariable("SandboxBaseUrl") ?? string.Empty;
         }
 
-        public async Task<string?> GetAccessTokenAsync(string _clientId, string _clientSecret)
+        public async Task<string?> GetAccessTokenAsync(string _clientId, string _clientSecret, PaymentEnvironment environment)
         {
             try
             {
-                var options = new RestClientOptions(_IdentityUrl)
+                var identityUrl = environment == PaymentEnvironment.Live ? _LiveIdentityUrl : _SandboxIdentityUrl;
+                var options = new RestClientOptions(identityUrl)
                 {
                     Authenticator = new HttpBasicAuthenticator(_clientId, _clientSecret)
                 };

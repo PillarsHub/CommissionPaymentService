@@ -22,7 +22,7 @@ namespace PaymentService.Services
 
         public async Task ProcesseBatch(Batch batch, string callbackToken, string pqClientId, string pqClientSecret, string pqFundingAccountPublicId, PaymentEnvironment pqEnvironment)
         {
-            var accessToken = await _payService.GetAccessTokenAsync(pqClientId, pqClientSecret);
+            var accessToken = await _payService.GetAccessTokenAsync(pqClientId, pqClientSecret, pqEnvironment);
             if (string.IsNullOrWhiteSpace(accessToken))
             {
                 foreach (var release in batch.Releases)

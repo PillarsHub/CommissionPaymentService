@@ -57,7 +57,16 @@ var app = builder.Build();
     {
         using var httpClient = new HttpClient();
         var ip = await httpClient.GetStringAsync("https://api.ipify.org");
-        return $"Egress IP: {ip}";
+
+        var liveIdentityUrl = Environment.GetEnvironmentVariable("LiveIdentityUrl") ?? string.Empty;
+        var liveBaseUrl = Environment.GetEnvironmentVariable("LiveBaseUrl") ?? string.Empty;
+
+        var sandboxIdentityUrl = Environment.GetEnvironmentVariable("SandboxIdentityUrl") ?? string.Empty;
+        var sandboxBaseUrl = Environment.GetEnvironmentVariable("SandboxBaseUrl") ?? string.Empty;
+
+        var commissionRootUrl = Environment.GetEnvironmentVariable("PillarsApiUrl") ?? string.Empty;
+
+        return $"Live Identity: {liveIdentityUrl}\r\nLive Base:{liveBaseUrl}\r\nSandbox Identity:{sandboxIdentityUrl}\r\nSandbox Base:{sandboxBaseUrl}\r\nPillars Url:{commissionRootUrl}\r\nEgress IP: {ip}";
     });
 
     app.MapControllers();
