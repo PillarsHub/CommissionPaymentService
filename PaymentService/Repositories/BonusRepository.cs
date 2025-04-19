@@ -12,9 +12,9 @@ namespace PaymentService.Repositories
             _client = client;
         }
 
-        public async Task UpdateBatch(string batchId, IEnumerable<ReleaseResult> released)
+        public async Task UpdateBatch(string token, string batchId, IEnumerable<ReleaseResult> released)
         {
-            await _client.Put<object, ReleaseResult[]>($"/api/v1/Batches/{batchId}", released.ToArray());
+            await _client.Put<object, ReleaseResult[]>($"/api/v1/Batches/{batchId}", released.ToArray(), token);
         }
     }
 }

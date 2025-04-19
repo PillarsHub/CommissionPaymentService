@@ -1,27 +1,29 @@
-﻿using Microsoft.Extensions.Caching.Memory;
-using Microsoft.OpenApi.Models;
+﻿using Microsoft.OpenApi.Models;
+using PaymentService;
 using PaymentService.Interfaces;
 using PaymentService.Repositories;
 using PaymentService.Services;
-using System.Net.Http.Headers;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 {
-    string bearerToken = Environment.GetEnvironmentVariable("ApiKey") ?? builder.Configuration["ApiKey"] ?? String.Empty;
-
     builder.Services.AddHttpClient<IClient, Client>(c =>
     {
-        c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", bearerToken);
         c.Timeout = TimeSpan.FromSeconds(30);
     }).SetHandlerLifetime(TimeSpan.FromMinutes(5));
     
     builder.Services.AddSingleton<IBatchService, BatchService>();
     builder.Services.AddSingleton<IBonusRepository, BonusRepository>();
     builder.Services.AddSingleton<ICustomerRepository, CustomerRepository>();
+    builder.Services.AddSingleton<IPayQuickerService, PayQuickerService>();
+    builder.Services.AddSingleton<BatchQueue>();
+
+    builder.Services.AddHostedService<BatchProcessingService>();
+
     builder.Services.AddControllers();
+
     builder.Services.AddSwaggerGen(c =>
     {
         c.SwaggerDoc("v1", new OpenApiInfo { Title = "Payment Processing Service", Version = "v1" });
@@ -31,8 +33,6 @@ builder.Logging.ClearProviders();
         .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
         .AddEnvironmentVariables()
         .Build();
-
-    builder.Services.AddSingleton<IPayQuickerService>(_ => new PayQuickerService(builder.Configuration, new MemoryCache(new MemoryCacheOptions())));
 }
 
 var app = builder.Build();
@@ -51,6 +51,13 @@ var app = builder.Build();
         var runtimeVersion = RuntimeInformation.FrameworkDescription;
 
         return $"Ver: {assemblyVersion}, Runtime: {runtimeVersion}";
+    });
+
+    app.MapGet("/debug/ip", async () =>
+    {
+        using var httpClient = new HttpClient();
+        var ip = await httpClient.GetStringAsync("https://api.ipify.org");
+        return $"Egress IP: {ip}";
     });
 
     app.MapControllers();

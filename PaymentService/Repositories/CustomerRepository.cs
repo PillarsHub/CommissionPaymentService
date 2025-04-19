@@ -12,9 +12,9 @@ namespace PaymentService.Repositories
             _client = client;
         }
 
-        public async Task<Customer> GetCustomer(string nodeId)
+        public async Task<Customer> GetCustomer(string token, string nodeId)
         {
-            return await _client.Get<Customer>($"/api/v1/Customers/{nodeId}");
+            return await _client.Get<Customer>($"/api/v1/Customers/{nodeId}", token);
         }
     }
 }

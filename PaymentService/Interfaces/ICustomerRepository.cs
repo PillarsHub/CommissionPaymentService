@@ -4,6 +4,6 @@ namespace PaymentService.Interfaces
 {
     public interface ICustomerRepository
     {
-        public Task<Customer> GetCustomer(string nodeId);
+        public Task<Customer> GetCustomer(string token, string nodeId);
     }
 }

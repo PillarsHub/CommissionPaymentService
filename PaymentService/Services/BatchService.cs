@@ -1,5 +1,4 @@
-﻿using Microsoft.VisualBasic;
-using PaymentService.Interfaces;
+﻿using PaymentService.Interfaces;
 using PaymentService.Models;
 
 namespace PaymentService.Services
@@ -9,76 +8,102 @@ namespace PaymentService.Services
         private readonly IBonusRepository _bonusRepository;
         private readonly ICustomerRepository _customerRepository;
         private readonly IPayQuickerService _payService;
-        private string _fundingAccountPublicId { get; set; }
+
+        private static readonly HashSet<string> SuccessStatuses = new() { "TransactionStatusType_Complete" };
+        private static readonly HashSet<string> PendingStatuses = new() { "TransactionStatusType_Pending", "TransactionStatusType_Scheduled", "TransactionStatusType_ReviewRequired" };
+        //private static readonly HashSet<string> FailureStatuses = new() { "TransactionStatusType_UNDEFINED", "TransactionStatusType_Failed", "TransactionStatusType_Canceled", "TransactionStatusType_Expired" };
+
         public BatchService(IBonusRepository bonusRepository, IPayQuickerService paymentService, ICustomerRepository customerRepository, IConfiguration config)
         {
             _bonusRepository = bonusRepository;
             _payService = paymentService;
-            _fundingAccountPublicId = Environment.GetEnvironmentVariable("PayQuickerFundingAccountPublicId") ?? String.Empty;
             _customerRepository = customerRepository;
         }
 
-        public async Task ProcesseBatch(Batch batch)
+        public async Task ProcesseBatch(Batch batch, string callbackToken, string pqClientId, string pqClientSecret, string pqFundingAccountPublicId, PaymentEnvironment pqEnvironment)
         {
-            var successStatuses = new List<string>()
+            var accessToken = await _payService.GetAccessTokenAsync(pqClientId, pqClientSecret);
+            if (string.IsNullOrWhiteSpace(accessToken))
             {
-                "TransactionStatusType_Complete",
-            }; 
-            var pendingStatuses = new List<string>()
-            {
-                "TransactionStatusType_Pending",
-                "TransactionStatusType_Scheduled",
-                "TransactionStatusType_ReviewRequired",
-            }; var failureStatuses = new List<string>()
-            {
-                "TransactionStatusType_UNDEFINED",
-                "TransactionStatusType_Failed",
-                "TransactionStatusType_Canceled",
-                "TransactionStatusType_Expired"
-            };
+                foreach (var release in batch.Releases)
+                    release.Status = Status.Failure;
+
+                await _bonusRepository.UpdateBatch(callbackToken, batch.Id, batch.Releases);
+                return;
+            }
+
+            var processed = new List<ReleaseResult>();
+            var updateInterval = TimeSpan.FromSeconds(5);
+            var lastUpdateTime = DateTime.UtcNow;
 
             foreach (var release in batch.Releases)
             {
-                var accountingId = $"{release.NodeId}-{release.BatchId}-{release.BonusId}";
-                var customer = await _customerRepository.GetCustomer(release.NodeId);
-                var req = new SendPaymentRequest()
+                try
                 {
-                    Payments = new List<SendPayment>()
-                    {
-                        new SendPayment()
-                        {
-                            AccountingId = accountingId,
-                            FundingAccountPublicId = _fundingAccountPublicId,
-                            IssuePlasticCard = false,
-                            Monetary = new Monetary()
-                            {
-                                Amount = release.Amount
-                            },
-                            UserCompanyAssignedUniqueKey = release.NodeId,
-                            UserNotificationEmailAddress = customer.EmailAddress,
-                            RecipientUserLanguageCode = "en-us",
-                        }
-                    }
-                };
-                
-                var result = await _payService.SendPaymentsAsync(req);
-                if (result.First().Payments.Any() && result.First().Payments.Any(x=>x.AccountingId==accountingId && successStatuses.Contains(x.TransactionStatusType)))
-                {
-                    release.Status = Status.Success;
+                    var accountingId = $"{release.NodeId}-{release.BatchId}-{release.BonusId}";
+                    var customer = await _customerRepository.GetCustomer(callbackToken, release.NodeId);
+
+                    var paymentRequest = BuildPaymentRequest(accountingId, release, customer.EmailAddress, pqFundingAccountPublicId);
+                    var response = await _payService.SendPaymentsAsync(accessToken, pqEnvironment, paymentRequest);
+
+                    release.Status = DetermineStatus(response, accountingId);
                 }
-                else if (result.First().Payments.Any() && result.First().Payments.Any(x =>
-                             x.AccountingId == accountingId && pendingStatuses.Contains(x.TransactionStatusType)))
-                {
-                    release.Status = Status.Pending;
-                }
-                else
+                catch
                 {
                     release.Status = Status.Failure;
                 }
+
+                processed.Add(release);
+
+                // Check if it's time to flush
+                if (DateTime.UtcNow - lastUpdateTime >= updateInterval)
+                {
+                    await _bonusRepository.UpdateBatch(callbackToken, batch.Id, processed.ToArray());
+                    processed.Clear();
+                    lastUpdateTime = DateTime.UtcNow;
+                }
             }
-            //Process the bonuses and mark them released.
-            var bonuses = batch.Releases.Select(x => { x.Status = Status.Success; return x; });
-            await _bonusRepository.UpdateBatch(batch.Id, bonuses);
+
+            // Final flush if any remain
+            if (processed.Count > 0)
+            {
+                await _bonusRepository.UpdateBatch(callbackToken, batch.Id, processed.ToArray());
+            }
+        }
+
+        private SendPaymentRequest BuildPaymentRequest(string accountingId, ReleaseResult release, string email, string fundingAccountPublicId)
+        {
+            return new SendPaymentRequest
+            {
+                Payments = new List<SendPayment>
+                {
+                    new SendPayment
+                    {
+                        AccountingId = accountingId,
+                        FundingAccountPublicId = fundingAccountPublicId,
+                        IssuePlasticCard = false,
+                        Monetary = new Monetary
+                        {
+                            Amount = release.Amount,
+                            CurrencyCode = release.Currency
+                        },
+                        UserCompanyAssignedUniqueKey = release.NodeId,
+                        UserNotificationEmailAddress = email,
+                        RecipientUserLanguageCode = "en-us"
+                    }
+                }
+            };
+        }
+
+        private Status DetermineStatus(List<SendPaymentsResult> responses, string accountingId)
+        {
+            var payment = responses.FirstOrDefault()?.Payments.FirstOrDefault(p => p.AccountingId == accountingId);
+            if (payment == null) return Status.Failure;
+
+            if (SuccessStatuses.Contains(payment.TransactionStatusType)) return Status.Success;
+            if (PendingStatuses.Contains(payment.TransactionStatusType)) return Status.Pending;
+
+            return Status.Failure;
         }
     }
 }

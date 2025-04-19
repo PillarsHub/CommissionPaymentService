@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using PaymentService.Interfaces;
 using PaymentService.Models;
 
 namespace PaymentService.Controllers
@@ -8,18 +7,18 @@ namespace PaymentService.Controllers
     [ApiController]
     public class BatchesController : ControllerBase
     {
-        private readonly IBatchService _batchService;
+        private readonly BatchQueue _batchQueue;
 
-        public BatchesController(IBatchService batchService)
+        public BatchesController(BatchQueue batchQueue)
         {
-            _batchService = batchService;
+            _batchQueue = batchQueue;
         }
 
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<IActionResult> Post([FromBody] Batch batch)
+        public IActionResult Post([FromBody] Batch batch)
         {
             try
             {
@@ -28,12 +27,21 @@ namespace PaymentService.Controllers
                     return BadRequest(ModelState);
                 }
 
-                var Token = HttpContext.Request.Headers["x-token"];
-                var CallbackToken = HttpContext.Request.Headers["x-callbacktoken"];
-                var CallbackTokenExpiration = HttpContext.Request.Headers["x-callbackexpire"];
+                var pqEnv = HttpContext.Request.Headers["x-pq_environment"].ToString();
 
-                await _batchService.ProcesseBatch(batch);
-                
+                var workItem = new BatchWorkItem
+                {
+                    Batch = batch,
+                    CallbackToken = HttpContext.Request.Headers["x-callbacktoken"].ToString(),
+                    CallbackTokenExpiration = HttpContext.Request.Headers["x-callbackexpire"].ToString(),
+                    ClientId = HttpContext.Request.Headers["x-pq_clientId"].ToString(),
+                    ClientSecret = HttpContext.Request.Headers["x-pq_clientSecret"].ToString(),
+                    FundingAccountPublicId = HttpContext.Request.Headers["x-pq_fundingAccountPublicId"].ToString(),
+                    Environment = pqEnv == "s" ? PaymentEnvironment.Sandbox : PaymentEnvironment.Live
+                };
+
+                _batchQueue.Enqueue(workItem);
+
                 return NoContent();
             }
             catch (Exception ex)

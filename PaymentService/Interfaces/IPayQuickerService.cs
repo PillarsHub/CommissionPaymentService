@@ -4,8 +4,7 @@ namespace PaymentService.Interfaces
 {
     public interface IPayQuickerService
     {
-        public Task<AccessToken?> GetAccessTokenAsync();
-        public Task<List<SendPaymentsResult>> SendPaymentsAsync(SendPaymentRequest sendPaymentRequest);
-        public Task<List<Monetary>> GetBalanceForUserAsync(string userId);
+        public Task<string?> GetAccessTokenAsync(string _clientId, string _clientSecret);
+        public Task<List<SendPaymentsResult>> SendPaymentsAsync(string accessToken, PaymentEnvironment environment, SendPaymentRequest sendPaymentRequest);
     }
 }

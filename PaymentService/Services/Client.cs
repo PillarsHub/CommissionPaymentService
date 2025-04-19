@@ -1,5 +1,6 @@
 ﻿using PaymentService.Interfaces;
 using PaymentService.Services.Exceptions;
+using System.Net.Http.Headers;
 
 namespace PaymentService.Services
 {
@@ -8,10 +9,10 @@ namespace PaymentService.Services
         private readonly HttpClient _client;
         private readonly string _commissionRootUrl;
 
-        public Client(IConfiguration configuration, HttpClient client)
+        public Client(HttpClient client)
         {
             _client = client;
-            _commissionRootUrl = configuration.GetValue<string>("ApiUrl");
+            _commissionRootUrl = Environment.GetEnvironmentVariable("PillarsApiUrl") ?? string.Empty;
         }
 
         private string GetRootUrl() 
@@ -63,17 +64,24 @@ namespace PaymentService.Services
             throw new System.Exception(content);
         }
 
-        public async Task<T> Get<T>(string url)
+        public async Task<T> Get<T>(string url, string callBackToken)
         {
-            var result = await _client.GetAsync(GetRootUrl() + url);
-            var temp = await result.Content.ReadAsStringAsync();
+            using var request = new HttpRequestMessage(HttpMethod.Get, GetRootUrl() + url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", callBackToken);
+
+            var result = await _client.SendAsync(request);
             return await ProcessResult<T>(result);
         }
 
-        public async Task<T> Put<T, R>(string url, R query)
+        public async Task<T> Put<T, R>(string url, R query, string callBackToken)
         {
-            var result = await _client.PutAsJsonAsync(GetRootUrl() + url, query);
+            using var request = new HttpRequestMessage(HttpMethod.Put, GetRootUrl() + url);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", callBackToken);
+            request.Content = JsonContent.Create(query);
+
+            var result = await _client.SendAsync(request);
             return await ProcessResult<T>(result);
         }
+
     }
 }
