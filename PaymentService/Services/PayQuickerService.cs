@@ -1,45 +1,59 @@
-﻿using PaymentService.Interfaces;
+﻿using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+using PaymentService.Interfaces;
 using PaymentService.Models;
-using RestSharp;
-using RestSharp.Authenticators;
-using System;
-
 
 namespace PaymentService.Services
 {
     public class PayQuickerService : IPayQuickerService
     {
-        private string _LiveIdentityUrl { get; set; } = string.Empty;
-        private string _LiveBaseUrl { get; set; } = string.Empty;
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly string _liveIdentityUrl;
+        private readonly string _liveBaseUrl;
+        private readonly string _sandboxIdentityUrl;
+        private readonly string _sandboxBaseUrl;
 
-        private string _SandboxIdentityUrl { get; set; } = string.Empty;
-        private string _SandboxBaseUrl { get; set; } = string.Empty;
-
-        public PayQuickerService()
+        public PayQuickerService(IHttpClientFactory httpClientFactory)
         {
-            _LiveIdentityUrl = Environment.GetEnvironmentVariable("LiveIdentityUrl") ?? string.Empty;
-            _LiveBaseUrl = Environment.GetEnvironmentVariable("LiveBaseUrl") ?? string.Empty;
+            _httpClientFactory = httpClientFactory;
 
-            _SandboxIdentityUrl = Environment.GetEnvironmentVariable("SandboxIdentityUrl") ?? string.Empty;
-            _SandboxBaseUrl = Environment.GetEnvironmentVariable("SandboxBaseUrl") ?? string.Empty;
+            _liveIdentityUrl = Environment.GetEnvironmentVariable("LiveIdentityUrl") ?? string.Empty;
+            _liveBaseUrl = Environment.GetEnvironmentVariable("LiveBaseUrl") ?? string.Empty;
+
+            _sandboxIdentityUrl = Environment.GetEnvironmentVariable("SandboxIdentityUrl") ?? string.Empty;
+            _sandboxBaseUrl = Environment.GetEnvironmentVariable("SandboxBaseUrl") ?? string.Empty;
         }
 
-        public async Task<string?> GetAccessTokenAsync(string _clientId, string _clientSecret, PaymentEnvironment environment)
+        public async Task<string?> GetAccessTokenAsync(string clientId, string clientSecret, PaymentEnvironment environment)
         {
             try
             {
-                var identityUrl = environment == PaymentEnvironment.Live ? _LiveIdentityUrl : _SandboxIdentityUrl;
-                var options = new RestClientOptions(identityUrl)
-                {
-                    Authenticator = new HttpBasicAuthenticator(_clientId, _clientSecret)
-                };
-                var restClient = new RestClient(options);
+                var identityUrl = environment == PaymentEnvironment.Live ? _liveIdentityUrl : _sandboxIdentityUrl;
 
-                var request = new RestRequest("/core/connect/token")
-                    .AddParameter("grant_type", "client_credentials")
-                    .AddParameter("scope", "api useraccount_balance useraccount_debit useraccount_payment useraccount_invitation", false);
-                var token = await restClient.PostAsync<AccessToken>(request);
-                return token?.Token ?? string.Empty;
+                var client = _httpClientFactory.CreateClient();
+
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{identityUrl}/core/connect/token");
+                var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
+                request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+
+                request.Content = new FormUrlEncodedContent(new[]
+                {
+                    new KeyValuePair<string, string>("grant_type", "client_credentials"),
+                    new KeyValuePair<string, string>("scope", "api useraccount_balance useraccount_debit useraccount_payment useraccount_invitation")
+                });
+
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"Failed to get token. Status: {response.StatusCode}, Content: {responseContent}");
+                    return null;
+                }
+
+                var tokenResponse = JsonSerializer.Deserialize<AccessToken>(responseContent);
+                return tokenResponse?.Token ?? string.Empty;
             }
             catch (Exception ex)
             {
@@ -52,19 +66,27 @@ namespace PaymentService.Services
         {
             try
             {
-                var baseUrl = environment == PaymentEnvironment.Live ? _LiveBaseUrl : _SandboxBaseUrl;
-                var options = new RestClientOptions(baseUrl)
+                var baseUrl = environment == PaymentEnvironment.Live ? _liveBaseUrl : _sandboxBaseUrl;
+                var client = _httpClientFactory.CreateClient();
+
+                var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/api/v1/companies/accounts/payments");
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                request.Headers.Add("X-MyPayQuicker-Version", "01-15-2018");
+
+                var json = JsonSerializer.Serialize(sendPaymentRequest);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    Timeout = TimeSpan.FromSeconds(15),
-                    Authenticator = new JwtAuthenticator(accessToken)
-                };
-                var client = new RestClient(options);
-                var request = new RestRequest("/api/v1/companies/accounts/payments").
-                    AddHeader("X-MyPayQuicker-Version", "01-15-2018")
-                    .AddJsonBody(sendPaymentRequest);
-                
-                var response = await client.PostAsync<List<SendPaymentsResult>>(request);
-                return response ?? new List<SendPaymentsResult>();
+                    Console.WriteLine($"Failed to send payments. Status: {response.StatusCode}, Content: {responseContent}");
+                    return new List<SendPaymentsResult>();
+                }
+
+                var results = JsonSerializer.Deserialize<List<SendPaymentsResult>>(responseContent);
+                return results ?? new List<SendPaymentsResult>();
             }
             catch (Exception ex)
             {
@@ -74,3 +96,4 @@ namespace PaymentService.Services
         }
     }
 }
+

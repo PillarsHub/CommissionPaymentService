@@ -40,7 +40,7 @@ namespace PaymentService.Services
             {
                 try
                 {
-                    var accountingId = $"{release.NodeId}-{release.BatchId}-{release.BonusId}";
+                    var accountingId = $"{release.NodeId}-{release.BatchId}-{release.DetailId}";
                     var customer = await _customerRepository.GetCustomer(callbackToken, release.NodeId);
 
                     var paymentRequest = BuildPaymentRequest(accountingId, release, customer.EmailAddress, pqFundingAccountPublicId);
@@ -84,12 +84,12 @@ namespace PaymentService.Services
                         IssuePlasticCard = false,
                         Monetary = new Monetary
                         {
-                            Amount = release.Amount,
-                            CurrencyCode = release.Currency
+                            Amount = release.Amount
                         },
                         UserCompanyAssignedUniqueKey = release.NodeId,
                         UserNotificationEmailAddress = email,
-                        RecipientUserLanguageCode = "en-us"
+                        RecipientUserLanguageCode = "en-us",
+                        //"memoComment": "Congratulations on your recent success!"
                     }
                 }
             };
@@ -101,7 +101,7 @@ namespace PaymentService.Services
             if (payment == null) return Status.Failure;
 
             if (SuccessStatuses.Contains(payment.TransactionStatusType)) return Status.Success;
-            if (PendingStatuses.Contains(payment.TransactionStatusType)) return Status.Pending;
+            if (PendingStatuses.Contains(payment.TransactionStatusType)) return Status.Success;
 
             return Status.Failure;
         }
