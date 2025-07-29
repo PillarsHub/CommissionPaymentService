@@ -79,8 +79,7 @@ namespace PaymentService.Services
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Console.WriteLine($"Failed to send payments. Status: {response.StatusCode}, Content: {responseContent}");
-                    return new List<SendPaymentsResult>();
+                    return GenerateFailReason($"Failed to send payments. Status: {response.StatusCode}, Content: {responseContent}");
                 }
 
                 var results = JsonSerializer.Deserialize<List<SendPaymentsResult>>(responseContent);
@@ -88,10 +87,23 @@ namespace PaymentService.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
-                return new List<SendPaymentsResult>();
+                return GenerateFailReason(ex.Message);
             }
         }
+
+        private List<SendPaymentsResult> GenerateFailReason(string failReason)
+        {
+            var failedPayment = new SendPayment { FailReason = failReason };
+
+            var failedPayments = new List<SendPayment>();
+            failedPayments.Add(failedPayment);
+
+            var result = new SendPaymentsResult { Payments = failedPayments };
+            var results = new List<SendPaymentsResult>();
+
+            return results;            
+        }
+
     }
 }
 

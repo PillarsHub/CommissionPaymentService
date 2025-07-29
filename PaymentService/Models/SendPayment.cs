@@ -30,5 +30,7 @@ namespace PaymentService.Models
 
         [JsonPropertyName("transactionStatusType")]
         public string TransactionStatusType { get; set; }
+
+        public string FailReason { get; set; } = string.Empty;
     }
 }

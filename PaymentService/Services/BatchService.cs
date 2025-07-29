@@ -106,6 +106,8 @@ namespace PaymentService.Services
             var payment = responses.FirstOrDefault()?.Payments.FirstOrDefault(p => p.AccountingId == accountingId);
             if (payment == null) return (Status.Failure, "No payment response");
 
+            if (!string.IsNullOrWhiteSpace(payment.FailReason)) return (Status.Failure, payment.FailReason);
+
             if (SuccessStatuses.Contains(payment.TransactionStatusType)) return (Status.Success, "");
             if (PendingStatuses.Contains(payment.TransactionStatusType)) return (Status.Success, "");
 
