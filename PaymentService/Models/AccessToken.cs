@@ -12,5 +12,7 @@ namespace PaymentService.Models
         public string TokenType { get; set; } = string.Empty;
         [JsonPropertyName("scope")]
         public string Scope { get; set; } = string.Empty;
+
+        public string FailReason { get; set; } = string.Empty;
     }
 }

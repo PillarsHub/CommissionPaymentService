@@ -23,10 +23,13 @@ namespace PaymentService.Services
         public async Task ProcesseBatch(Batch batch, string callbackToken, string pqClientId, string pqClientSecret, string pqFundingAccountPublicId, PaymentEnvironment pqEnvironment)
         {
             var accessToken = await _payService.GetAccessTokenAsync(pqClientId, pqClientSecret, pqEnvironment);
-            if (string.IsNullOrWhiteSpace(accessToken))
+            if (string.IsNullOrWhiteSpace(accessToken.Token))
             {
                 foreach (var release in batch.Releases)
+                {
                     release.Status = Status.Failure;
+                    release.StatusReason = accessToken.FailReason;
+                }
 
                 await _bonusRepository.UpdateBatch(callbackToken, batch.Id, batch.Releases);
                 return;
@@ -44,13 +47,16 @@ namespace PaymentService.Services
                     var customer = await _customerRepository.GetCustomer(callbackToken, release.NodeId);
 
                     var paymentRequest = BuildPaymentRequest(accountingId, release, customer.EmailAddress, pqFundingAccountPublicId);
-                    var response = await _payService.SendPaymentsAsync(accessToken, pqEnvironment, paymentRequest);
+                    var response = await _payService.SendPaymentsAsync(accessToken.Token, pqEnvironment, paymentRequest);
 
-                    release.Status = DetermineStatus(response, accountingId);
+                    var aabb = DetermineStatus(response, accountingId);
+                    release.Status = aabb.Item1;
+                    release.StatusReason = aabb.Item2;
                 }
-                catch
+                catch (Exception ex)
                 {
                     release.Status = Status.Failure;
+                    release.StatusReason = ex.Message;
                 }
 
                 processed.Add(release);
@@ -95,15 +101,15 @@ namespace PaymentService.Services
             };
         }
 
-        private Status DetermineStatus(List<SendPaymentsResult> responses, string accountingId)
+        private (Status, string) DetermineStatus(List<SendPaymentsResult> responses, string accountingId)
         {
             var payment = responses.FirstOrDefault()?.Payments.FirstOrDefault(p => p.AccountingId == accountingId);
-            if (payment == null) return Status.Failure;
+            if (payment == null) return (Status.Failure, "No payment response");
 
-            if (SuccessStatuses.Contains(payment.TransactionStatusType)) return Status.Success;
-            if (PendingStatuses.Contains(payment.TransactionStatusType)) return Status.Success;
+            if (SuccessStatuses.Contains(payment.TransactionStatusType)) return (Status.Success, "");
+            if (PendingStatuses.Contains(payment.TransactionStatusType)) return (Status.Success, "");
 
-            return Status.Failure;
+            return (Status.Failure, payment.TransactionStatusType);
         }
     }
 }

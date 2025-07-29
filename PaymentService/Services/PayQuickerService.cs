@@ -25,7 +25,7 @@ namespace PaymentService.Services
             _sandboxBaseUrl = Environment.GetEnvironmentVariable("SandboxBaseUrl") ?? string.Empty;
         }
 
-        public async Task<string?> GetAccessTokenAsync(string clientId, string clientSecret, PaymentEnvironment environment)
+        public async Task<AccessToken> GetAccessTokenAsync(string clientId, string clientSecret, PaymentEnvironment environment)
         {
             try
             {
@@ -48,17 +48,15 @@ namespace PaymentService.Services
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    Console.WriteLine($"Failed to get token. Status: {response.StatusCode}, Content: {responseContent}");
-                    return null;
+                    return new AccessToken { FailReason = $"Failed to get token. Status: {response.StatusCode}, Content: {responseContent}" };
                 }
 
                 var tokenResponse = JsonSerializer.Deserialize<AccessToken>(responseContent);
-                return tokenResponse?.Token ?? string.Empty;
+                return tokenResponse ?? new AccessToken { FailReason = "Invalid access token response"};
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
-                return null;
+                return new AccessToken { FailReason = ex.Message };
             }
         }
 

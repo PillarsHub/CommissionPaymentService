@@ -10,5 +10,6 @@
         public long DetailId { get; set; }
         public long PeriodId { get; set; }
         public Status Status { get; set; }
+        public string? StatusReason { get; set; }
     }
 }
