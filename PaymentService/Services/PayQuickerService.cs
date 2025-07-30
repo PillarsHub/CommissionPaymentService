@@ -94,12 +94,7 @@ namespace PaymentService.Services
 
         private List<SendPaymentsResult> GenerateFailReason(string accountingId, string failReason)
         {
-            var failedPayment = new SendPayment { AccountingId = accountingId, FailReason = failReason };
-
-            var failedPayments = new List<SendPayment>();
-            failedPayments.Add(failedPayment);
-
-            var result = new SendPaymentsResult { Payments = failedPayments };
+            var result = new SendPaymentsResult { FailReason = failReason };
             var results = new List<SendPaymentsResult>();
             results.Add(result);
 

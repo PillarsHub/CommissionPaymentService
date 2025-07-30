@@ -103,10 +103,11 @@ namespace PaymentService.Services
 
         private (Status, string) DetermineStatus(List<SendPaymentsResult> responses, string accountingId)
         {
+            var response = responses.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(response?.FailReason)) return (Status.Failure, response.FailReason);
+
             var payment = responses.FirstOrDefault()?.Payments.FirstOrDefault();
             if (payment == null) return (Status.Failure, "No payment response");
-
-            if (!string.IsNullOrWhiteSpace(payment.FailReason)) return (Status.Failure, payment.FailReason);
 
             if (SuccessStatuses.Contains(payment.TransactionStatusType)) return (Status.Success, "");
             if (PendingStatuses.Contains(payment.TransactionStatusType)) return (Status.Success, "");
