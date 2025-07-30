@@ -47,7 +47,7 @@ namespace PaymentService.Services
                     var customer = await _customerRepository.GetCustomer(callbackToken, release.NodeId);
 
                     var paymentRequest = BuildPaymentRequest(accountingId, release, customer.EmailAddress, pqFundingAccountPublicId);
-                    var response = await _payService.SendPaymentsAsync(accessToken.Token, pqEnvironment, paymentRequest);
+                    var response = await _payService.SendPaymentsAsync(accountingId, accessToken.Token, pqEnvironment, paymentRequest);
 
                     var aabb = DetermineStatus(response, accountingId);
                     release.Status = aabb.Item1;

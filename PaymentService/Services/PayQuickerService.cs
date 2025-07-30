@@ -60,7 +60,7 @@ namespace PaymentService.Services
             }
         }
 
-        public async Task<List<SendPaymentsResult>> SendPaymentsAsync(string accessToken, PaymentEnvironment environment, SendPaymentRequest sendPaymentRequest)
+        public async Task<List<SendPaymentsResult>> SendPaymentsAsync(string accessToken, string accountingId, PaymentEnvironment environment, SendPaymentRequest sendPaymentRequest)
         {
             try
             {
@@ -79,7 +79,7 @@ namespace PaymentService.Services
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    return GenerateFailReason($"Failed to send payments. Status: {response.StatusCode}, Content: {responseContent}");
+                    return GenerateFailReason(accountingId, $"Failed to send payments. Status: {response.StatusCode}, Content: {responseContent}");
                 }
 
                 var results = JsonSerializer.Deserialize<List<SendPaymentsResult>>(responseContent);
@@ -87,13 +87,13 @@ namespace PaymentService.Services
             }
             catch (Exception ex)
             {
-                return GenerateFailReason(ex.Message);
+                return GenerateFailReason(accountingId, ex.Message);
             }
         }
 
-        private List<SendPaymentsResult> GenerateFailReason(string failReason)
+        private List<SendPaymentsResult> GenerateFailReason(string accountingId, string failReason)
         {
-            var failedPayment = new SendPayment { FailReason = failReason };
+            var failedPayment = new SendPayment { AccountingId = accountingId, FailReason = failReason };
 
             var failedPayments = new List<SendPayment>();
             failedPayments.Add(failedPayment);
