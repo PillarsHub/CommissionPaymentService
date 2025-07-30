@@ -77,7 +77,7 @@ namespace PaymentService.Services
                 using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
-                //if (!response.IsSuccessStatusCode)
+                if (!response.IsSuccessStatusCode)
                 {
                     return GenerateFailReason(accountingId, $"Failed to send payments. Status: {response.StatusCode}, Content: {responseContent}");
                 }
@@ -100,6 +100,7 @@ namespace PaymentService.Services
 
             var result = new SendPaymentsResult { Payments = failedPayments };
             var results = new List<SendPaymentsResult>();
+            results.Add(result);
 
             return results;            
         }
