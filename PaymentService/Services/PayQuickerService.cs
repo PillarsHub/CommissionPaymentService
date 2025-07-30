@@ -67,7 +67,8 @@ namespace PaymentService.Services
                 var baseUrl = environment == PaymentEnvironment.Live ? _liveBaseUrl : _sandboxBaseUrl;
                 var client = _httpClientFactory.CreateClient();
 
-                var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/api/v1/companies/accounts/payments");
+                var url = $"{baseUrl}/api/v1/companies/accounts/payments";
+                var request = new HttpRequestMessage(HttpMethod.Post, url);
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
                 request.Headers.Add("X-MyPayQuicker-Version", "01-15-2018");
 
@@ -79,11 +80,11 @@ namespace PaymentService.Services
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    return GenerateFailReason(accountingId, $"Failed to send payments. Status: {response.StatusCode}, Content: {responseContent}");
+                    return GenerateFailReason(accountingId, $"Failed to send payments. Url: {url} Status: {response.StatusCode} Request: {request.Content} Response: {responseContent}");
                 }
 
                 var results = JsonSerializer.Deserialize<List<SendPaymentsResult>>(responseContent);
-                return results ?? GenerateFailReason(accountingId, $"Failed to parse payment results. Status: {response.StatusCode}, Content: {responseContent}");
+                return results ?? new List<SendPaymentsResult>();
             }
             catch (Exception ex)
             {
