@@ -77,13 +77,13 @@ namespace PaymentService.Services
                 using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                 var responseContent = await response.Content.ReadAsStringAsync();
 
-                if (!response.IsSuccessStatusCode)
+                //if (!response.IsSuccessStatusCode)
                 {
                     return GenerateFailReason(accountingId, $"Failed to send payments. Status: {response.StatusCode}, Content: {responseContent}");
                 }
 
                 var results = JsonSerializer.Deserialize<List<SendPaymentsResult>>(responseContent);
-                return results ?? new List<SendPaymentsResult>();
+                return results ?? GenerateFailReason(accountingId, $"Failed to parse payment results. Status: {response.StatusCode}, Content: {responseContent}");
             }
             catch (Exception ex)
             {
