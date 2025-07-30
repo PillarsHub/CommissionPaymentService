@@ -80,7 +80,7 @@ namespace PaymentService.Services
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    return GenerateFailReason(accountingId, $"Failed to send payments. Url: {url} Status: {response.StatusCode} Request: {request.Content} Response: {responseContent}");
+                    return GenerateFailReason(accountingId, $"Failed to send payments. Url: {url} Request: {json} Status: {(int)response.StatusCode} Response: {responseContent}");
                 }
 
                 var results = JsonSerializer.Deserialize<List<SendPaymentsResult>>(responseContent);
