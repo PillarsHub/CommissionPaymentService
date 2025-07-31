@@ -60,7 +60,7 @@ namespace PaymentService.Services
             }
         }
 
-        public async Task<List<SendPaymentsResult>> SendPaymentsAsync(string accessToken, string accountingId, PaymentEnvironment environment, SendPaymentRequest sendPaymentRequest)
+        public async Task<List<SendPaymentsResult>> SendPaymentsAsync(string accountingId, string accessToken,  PaymentEnvironment environment, SendPaymentRequest sendPaymentRequest)
         {
             try
             {

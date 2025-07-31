@@ -43,7 +43,7 @@ namespace PaymentService.Services
             {
                 try
                 {
-                    var accountingId = $"{release.NodeId}-{release.BatchId}-{release.DetailId}";
+                    var accountingId = $"{release.BatchId}-{release.DetailId}";
                     var customer = await _customerRepository.GetCustomer(callbackToken, release.NodeId);
 
                     var paymentRequest = BuildPaymentRequest(accountingId, release, customer.EmailAddress, pqFundingAccountPublicId);
