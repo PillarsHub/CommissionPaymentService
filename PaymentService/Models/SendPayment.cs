@@ -30,5 +30,8 @@ namespace PaymentService.Models
 
         [JsonPropertyName("transactionStatusType")]
         public string TransactionStatusType { get; set; }
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; }
     }
 }

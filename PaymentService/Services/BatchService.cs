@@ -112,7 +112,7 @@ namespace PaymentService.Services
             if (SuccessStatuses.Contains(payment.TransactionStatusType)) return (Status.Success, "");
             if (PendingStatuses.Contains(payment.TransactionStatusType)) return (Status.Success, "");
 
-            return (Status.Failure, payment.TransactionStatusType);
+            return (Status.Failure, $"{payment.TransactionStatusType} - {payment.Status}");
         }
     }
 }
