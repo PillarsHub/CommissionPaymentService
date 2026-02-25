@@ -88,7 +88,7 @@ var app = builder.Build();
 
     app.MapGet("/", () =>
     {
-        var assemblyVersion = "1.2.0.0";
+        var assemblyVersion = "1.3.0.0";
         var runtimeVersion = RuntimeInformation.FrameworkDescription;
 
         return Results.Content($$"""
