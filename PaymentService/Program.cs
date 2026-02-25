@@ -6,8 +6,8 @@ using PaymentService.Services;
 using Polly;
 using Polly.Contrib.WaitAndRetry;
 using System.Net;
-using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
@@ -17,6 +17,7 @@ builder.Logging.ClearProviders();
         c.Timeout = TimeSpan.FromSeconds(30);
     }).SetHandlerLifetime(TimeSpan.FromMinutes(5)).AddPolicyHandler(GetRetryPolicy());
     
+    builder.Services.AddSingleton<ProgressStatusManager>();
     builder.Services.AddSingleton<IBatchService, BatchService>();
     builder.Services.AddSingleton<IBonusRepository, BonusRepository>();
     builder.Services.AddSingleton<ICustomerRepository, CustomerRepository>();
@@ -48,12 +49,154 @@ var app = builder.Build();
     app.UseSwagger();
     app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Payment Processing Service v1"));
 
+    app.MapGet("/status", (ProgressStatusManager pgManager) =>
+    {
+        var items = pgManager.GetProgressStatus();
+
+        return items.Select(x => new
+        {
+            x.Item1.Currency,
+            x.Item1.BatchId,
+            x.Item1.DetailId,
+            x.Item1.PeriodId,
+            ReleaseStatus = x.Item1.Status,
+            x.Item1.StatusReason,
+            ManagerStatus = x.Item2
+        });
+    });
+
+    app.MapGet("/counts", (ProgressStatusManager pgManager) =>
+    {
+        // List<(long,(int,int))>
+        var counts = pgManager.GetUpdateCount();
+
+        // Return JSON-friendly shape
+        return counts.Select(x => new
+        {
+            Id = x.Item1,              // the long
+            Count1 = x.Item2.Item1,    // first int
+            Count2 = x.Item2.Item2     // second int
+        });
+    });
+
     app.MapGet("/", () =>
     {
-        var assemblyVersion = "1.2.0.0";
+        var assemblyVersion = "1.3.0.0";
         var runtimeVersion = RuntimeInformation.FrameworkDescription;
 
-        return $"Ver: {assemblyVersion}, Runtime: {runtimeVersion}";
+        return Results.Content($$"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Progress Status</title>
+    <style>
+        body { font-family: Arial; padding:20px; }
+        table { border-collapse: collapse; width:100%; }
+        th, td { border:1px solid #ccc; padding:6px; }
+        th { background:#f4f4f4; }
+
+        .meta { margin-bottom: 14px; }
+        .counts { margin: 12px 0 18px 0; }
+        .counts table { width: auto; min-width: 420px; }
+    </style>
+</head>
+<body>
+
+<div class="meta">
+  <h3>Version: {{assemblyVersion}}</h3>
+  <h4>Runtime: {{runtimeVersion}}</h4>
+</div>
+
+<div class="counts">
+  <h4>Counts</h4>
+  <table>
+    <thead>
+      <tr>
+        <th>Id</th>
+        <th>Count 1</th>
+        <th>Count 2</th>
+      </tr>
+    </thead>
+    <tbody id="countsBody"></tbody>
+  </table>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Currency</th>
+            <th>BatchId</th>
+            <th>DetailId</th>
+            <th>PeriodId</th>
+            <th>Release Status</th>
+            <th>Status Reason</th>
+            <th>Manager Status</th>
+        </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+</table>
+
+<script>
+async function refreshStatus() {
+    try {
+        const res = await fetch('/status', { cache: "no-store" });
+        const data = await res.json();
+
+        const body = document.getElementById("tableBody");
+        body.innerHTML = "";
+
+        for (const row of data) {
+            body.insertAdjacentHTML("beforeend", `
+                <tr>
+                    <td>${row.currency}</td>
+                    <td>${row.batchId ?? ""}</td>
+                    <td>${row.detailId}</td>
+                    <td>${row.periodId}</td>
+                    <td>${row.releaseStatus}</td>
+                    <td>${row.statusReason ?? ""}</td>
+                    <td>${row.managerStatus}</td>
+                </tr>
+            `);
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function refreshCounts() {
+    try {
+        const res = await fetch('/counts', { cache: "no-store" });
+        const data = await res.json();
+
+        const body = document.getElementById("countsBody");
+        body.innerHTML = "";
+
+        for (const row of data) {
+            body.insertAdjacentHTML("beforeend", `
+                <tr>
+                    <td>${row.id}</td>
+                    <td>${row.count1}</td>
+                    <td>${row.count2}</td>
+                </tr>
+            `);
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+function refreshAll() {
+    refreshCounts();
+    refreshStatus();
+}
+
+setInterval(refreshAll, 100);
+refreshAll();
+</script>
+
+</body>
+</html>
+""", "text/html");
     });
 
     app.MapGet("/debug/ip", async () =>
