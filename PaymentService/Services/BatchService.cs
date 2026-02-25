@@ -52,6 +52,7 @@ namespace PaymentService.Services
 
                     try
                     {
+                        release.Status = Status.Pending;
                         _progressStatusManager.UpdateProgressStatus(release);
                         var accountingId = $"{release.BatchId}-{release.DetailId}";
                         var customer = await _customerRepository.GetCustomer(callbackToken, release.NodeId);
@@ -69,13 +70,13 @@ namespace PaymentService.Services
                         release.StatusReason = ex.Message;
                     }
 
-                    
+
 
                     //processed.Add(release);
 
                     // Check if it's time to flush
-                    _progressStatusManager.UpdateProgressStatus([release]);
                     await _bonusRepository.UpdateBatch(callbackToken, batch.Id, [release]);
+                    _progressStatusManager.UpdateProgressStatus([release]);
 
                     count++;
                     //processed.Clear();
