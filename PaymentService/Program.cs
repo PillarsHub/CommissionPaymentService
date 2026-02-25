@@ -3,6 +3,9 @@ using PaymentService;
 using PaymentService.Interfaces;
 using PaymentService.Repositories;
 using PaymentService.Services;
+using Polly;
+using Polly.Contrib.WaitAndRetry;
+using System.Net;
 using System.Reflection;
 using System.Runtime.InteropServices;
 
@@ -12,7 +15,7 @@ builder.Logging.ClearProviders();
     builder.Services.AddHttpClient<IClient, Client>(c =>
     {
         c.Timeout = TimeSpan.FromSeconds(30);
-    }).SetHandlerLifetime(TimeSpan.FromMinutes(5));
+    }).SetHandlerLifetime(TimeSpan.FromMinutes(5)).AddPolicyHandler(GetRetryPolicy());
     
     builder.Services.AddSingleton<IBatchService, BatchService>();
     builder.Services.AddSingleton<IBonusRepository, BonusRepository>();
@@ -73,3 +76,19 @@ var app = builder.Build();
 }
 
 app.Run();
+
+
+
+
+static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+{
+    var delay = Backoff.DecorrelatedJitterBackoffV2(medianFirstRetryDelay: TimeSpan.FromSeconds(1), retryCount: 5);
+
+    return Policy<HttpResponseMessage>
+        .Handle<HttpRequestException>()
+        .OrResult(response =>
+            (int)response.StatusCode >= 500
+            || response.StatusCode == HttpStatusCode.RequestTimeout
+            || response.StatusCode == HttpStatusCode.TooManyRequests)
+        .WaitAndRetryAsync(delay);
+}
