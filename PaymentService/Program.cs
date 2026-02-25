@@ -50,7 +50,7 @@ var app = builder.Build();
 
     app.MapGet("/", () =>
     {
-        var assemblyVersion = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "Unknown";
+        var assemblyVersion = "1.2.0.0";
         var runtimeVersion = RuntimeInformation.FrameworkDescription;
 
         return $"Ver: {assemblyVersion}, Runtime: {runtimeVersion}";
