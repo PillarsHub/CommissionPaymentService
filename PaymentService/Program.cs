@@ -7,14 +7,13 @@ using Polly;
 using Polly.Contrib.WaitAndRetry;
 using System.Net;
 using System.Runtime.InteropServices;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 {
     builder.Services.AddHttpClient<IClient, Client>(c =>
     {
-        c.Timeout = TimeSpan.FromSeconds(30);
+        c.Timeout = TimeSpan.FromSeconds(60);
     }).SetHandlerLifetime(TimeSpan.FromMinutes(5)).AddPolicyHandler(GetRetryPolicy());
     
     builder.Services.AddSingleton<ProgressStatusManager>();
@@ -79,9 +78,17 @@ var app = builder.Build();
         });
     });
 
+    app.MapGet("/last-error", (ProgressStatusManager pgManager) =>
+    {
+        return Results.Ok(new
+        {
+            message = pgManager.GetLastErrorMessage()
+        });
+    });
+
     app.MapGet("/", () =>
     {
-        var assemblyVersion = "1.3.0.0";
+        var assemblyVersion = "1.2.0.0";
         var runtimeVersion = RuntimeInformation.FrameworkDescription;
 
         return Results.Content($$"""
@@ -91,13 +98,31 @@ var app = builder.Build();
     <title>Progress Status</title>
     <style>
         body { font-family: Arial; padding:20px; }
+
         table { border-collapse: collapse; width:100%; }
         th, td { border:1px solid #ccc; padding:6px; }
         th { background:#f4f4f4; }
 
-        .meta { margin-bottom: 14px; }
-        .counts { margin: 12px 0 18px 0; }
-        .counts table { width: auto; min-width: 420px; }
+        .meta { margin-bottom:14px; }
+
+        .errorBox {
+            margin: 10px 0 20px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #fff3f3;
+            border: 1px solid #cc0000;
+            color: #900;
+            font-weight: bold;
+        }
+
+        .errorBox.ok {
+            background: #f3fff3;
+            border-color: #2a8a2a;
+            color: #1f6f1f;
+        }
+
+        .counts { margin-bottom:20px; }
+        .counts table { width:auto; min-width:420px; }
     </style>
 </head>
 <body>
@@ -105,6 +130,10 @@ var app = builder.Build();
 <div class="meta">
   <h3>Version: {{assemblyVersion}}</h3>
   <h4>Runtime: {{runtimeVersion}}</h4>
+</div>
+
+<div id="errorBox" class="errorBox ok">
+    No errors
 </div>
 
 <div class="counts">
@@ -138,54 +167,62 @@ var app = builder.Build();
 
 <script>
 async function refreshStatus() {
-    try {
-        const res = await fetch('/status', { cache: "no-store" });
-        const data = await res.json();
+    const res = await fetch('/status', { cache: "no-store" });
+    const data = await res.json();
 
-        const body = document.getElementById("tableBody");
-        body.innerHTML = "";
+    const body = document.getElementById("tableBody");
+    body.innerHTML = "";
 
-        for (const row of data) {
-            body.insertAdjacentHTML("beforeend", `
-                <tr>
-                    <td>${row.currency}</td>
-                    <td>${row.batchId ?? ""}</td>
-                    <td>${row.detailId}</td>
-                    <td>${row.periodId}</td>
-                    <td>${row.releaseStatus}</td>
-                    <td>${row.statusReason ?? ""}</td>
-                    <td>${row.managerStatus}</td>
-                </tr>
-            `);
-        }
-    } catch (e) {
-        console.error(e);
+    for (const row of data) {
+        body.insertAdjacentHTML("beforeend", `
+            <tr>
+                <td>${row.currency}</td>
+                <td>${row.batchId ?? ""}</td>
+                <td>${row.detailId}</td>
+                <td>${row.periodId}</td>
+                <td>${row.releaseStatus}</td>
+                <td>${row.statusReason ?? ""}</td>
+                <td>${row.managerStatus}</td>
+            </tr>
+        `);
     }
 }
 
 async function refreshCounts() {
-    try {
-        const res = await fetch('/counts', { cache: "no-store" });
-        const data = await res.json();
+    const res = await fetch('/counts', { cache: "no-store" });
+    const data = await res.json();
 
-        const body = document.getElementById("countsBody");
-        body.innerHTML = "";
+    const body = document.getElementById("countsBody");
+    body.innerHTML = "";
 
-        for (const row of data) {
-            body.insertAdjacentHTML("beforeend", `
-                <tr>
-                    <td>${row.id}</td>
-                    <td>${row.count1}</td>
-                    <td>${row.count2}</td>
-                </tr>
-            `);
-        }
-    } catch (e) {
-        console.error(e);
+    for (const row of data) {
+        body.insertAdjacentHTML("beforeend", `
+            <tr>
+                <td>${row.id}</td>
+                <td>${row.count1}</td>
+                <td>${row.count2}</td>
+            </tr>
+        `);
+    }
+}
+
+async function refreshError() {
+    const res = await fetch('/last-error', { cache: "no-store" });
+    const data = await res.json();
+
+    const box = document.getElementById("errorBox");
+
+    if (!data.message || data.message.trim() === "") {
+        box.textContent = "No errors";
+        box.classList.add("ok");
+    } else {
+        box.textContent = data.message;
+        box.classList.remove("ok");
     }
 }
 
 function refreshAll() {
+    refreshError();
     refreshCounts();
     refreshStatus();
 }

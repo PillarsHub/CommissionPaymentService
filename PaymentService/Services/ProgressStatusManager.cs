@@ -1,7 +1,5 @@
 ﻿using PaymentService.Models;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 
 namespace PaymentService.Services
 {
@@ -10,6 +8,7 @@ namespace PaymentService.Services
         private readonly ConcurrentDictionary<long, Status> _progressStatuses = new ConcurrentDictionary<long, Status>();
         private readonly ConcurrentDictionary<long, ReleaseResult> _progressResults = new ConcurrentDictionary<long, ReleaseResult>();
         private readonly ConcurrentDictionary<string, (int,int)> _updateCounts = new ConcurrentDictionary<string, (int, int)>();
+        private string _lastErrorMessage = string.Empty;
 
         public void UpdateUpdateCount(string key, (int,int) values)
         {
@@ -22,6 +21,21 @@ namespace PaymentService.Services
             return aa.ToList();
         }   
 
+        public void SetLastErrorMessage(string message)
+        {
+            lock (_progressStatuses)
+            {
+                _lastErrorMessage = message;
+            }
+        }
+
+        public string GetLastErrorMessage()
+        {
+            lock (_progressStatuses)
+            {
+                return _lastErrorMessage;
+            }
+        }
 
         public void UpdateProgressStatus(List<ReleaseResult>? payments)
         {

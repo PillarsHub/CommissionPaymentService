@@ -41,52 +41,60 @@ namespace PaymentService.Services
             var updateInterval = TimeSpan.FromSeconds(5);
             var lastUpdateTime = DateTime.UtcNow;
 
-            var count = 0;
-            var total = batch.Releases.Length;
-            foreach (var release in batch.Releases)
+            try
             {
-                try
+                var count = 0;
+                var total = batch.Releases.Length;
+                _progressStatusManager.SetLastErrorMessage("Processing Batch"); // Clear any previous error
+                foreach (var release in batch.Releases)
                 {
-                    _progressStatusManager.UpdateProgressStatus(release);
-                    var accountingId = $"{release.BatchId}-{release.DetailId}";
-                    var customer = await _customerRepository.GetCustomer(callbackToken, release.NodeId);
+                    try
+                    {
+                        _progressStatusManager.UpdateProgressStatus(release);
+                        var accountingId = $"{release.BatchId}-{release.DetailId}";
+                        var customer = await _customerRepository.GetCustomer(callbackToken, release.NodeId);
 
-                    var paymentRequest = BuildPaymentRequest(accountingId, release, customer.EmailAddress, pqFundingAccountPublicId);
-                    var response = await _payService.SendPaymentsAsync(accountingId, accessToken.Token, pqEnvironment, paymentRequest);
+                        var paymentRequest = BuildPaymentRequest(accountingId, release, customer.EmailAddress, pqFundingAccountPublicId);
+                        var response = await _payService.SendPaymentsAsync(accountingId, accessToken.Token, pqEnvironment, paymentRequest);
 
-                    var aabb = DetermineStatus(response, accountingId);
-                    release.Status = aabb.Item1;
-                    release.StatusReason = aabb.Item2;
+                        var aabb = DetermineStatus(response, accountingId);
+                        release.Status = aabb.Item1;
+                        release.StatusReason = aabb.Item2;
+                    }
+                    catch (Exception ex)
+                    {
+                        release.Status = Status.Failure;
+                        release.StatusReason = ex.Message;
+                    }
+
+                    count++;
+                    _progressStatusManager.UpdateUpdateCount(batch.Id, (total, count));
+
+                    processed.Add(release);
+
+                    // Check if it's time to flush
+                    if (DateTime.UtcNow - lastUpdateTime >= updateInterval)
+                    {
+                        await _bonusRepository.UpdateBatch(callbackToken, batch.Id, processed.ToArray());
+                        _progressStatusManager.UpdateProgressStatus(processed);
+                        processed.Clear();
+                        lastUpdateTime = DateTime.UtcNow;
+                    }
                 }
-                catch (Exception ex)
-                {
-                    release.Status = Status.Failure;
-                    release.StatusReason = ex.Message;
-                }
 
-                count++;
-                _progressStatusManager.UpdateUpdateCount(batch.Id, (total, count));
-
-                processed.Add(release);
-
-                // Check if it's time to flush
-                if (DateTime.UtcNow - lastUpdateTime >= updateInterval)
+                // Final flush if any remain
+                if (processed.Count > 0)
                 {
                     await _bonusRepository.UpdateBatch(callbackToken, batch.Id, processed.ToArray());
                     _progressStatusManager.UpdateProgressStatus(processed);
-                    processed.Clear();
-                    lastUpdateTime = DateTime.UtcNow;
                 }
-            }
 
-            // Final flush if any remain
-            if (processed.Count > 0)
+                _progressStatusManager.UpdateUpdateCount(batch.Id, (total, total));
+            }
+            catch (Exception ex)
             {
-                await _bonusRepository.UpdateBatch(callbackToken, batch.Id, processed.ToArray());
-                _progressStatusManager.UpdateProgressStatus(processed);
+                _progressStatusManager.SetLastErrorMessage(ex.Message);
             }
-
-            _progressStatusManager.UpdateUpdateCount(batch.Id, (total, total));
         }
 
         private SendPaymentRequest BuildPaymentRequest(string accountingId, ReleaseResult release, string email, string fundingAccountPublicId)
