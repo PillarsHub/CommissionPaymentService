@@ -37,17 +37,19 @@ namespace PaymentService.Services
                 return;
             }
 
-            var processed = new List<ReleaseResult>();
-            var updateInterval = TimeSpan.FromSeconds(5);
-            var lastUpdateTime = DateTime.UtcNow;
+            //var processed = new List<ReleaseResult>();
+            //var updateInterval = TimeSpan.FromSeconds(5);
+            //var lastUpdateTime = DateTime.UtcNow;
 
             try
             {
-                var count = 0;
+                var count = 1;
                 var total = batch.Releases.Length;
                 _progressStatusManager.SetLastErrorMessage("Processing Batch"); // Clear any previous error
                 foreach (var release in batch.Releases)
                 {
+                    _progressStatusManager.UpdateUpdateCount(batch.Id, (total, count));
+
                     try
                     {
                         _progressStatusManager.UpdateProgressStatus(release);
@@ -67,33 +69,35 @@ namespace PaymentService.Services
                         release.StatusReason = ex.Message;
                     }
 
-                    count++;
-                    _progressStatusManager.UpdateUpdateCount(batch.Id, (total, count));
+                    
 
-                    processed.Add(release);
+                    //processed.Add(release);
 
                     // Check if it's time to flush
-                    if (DateTime.UtcNow - lastUpdateTime >= updateInterval)
-                    {
-                        await _bonusRepository.UpdateBatch(callbackToken, batch.Id, processed.ToArray());
-                        _progressStatusManager.UpdateProgressStatus(processed);
-                        processed.Clear();
-                        lastUpdateTime = DateTime.UtcNow;
-                    }
+                    _progressStatusManager.UpdateProgressStatus([release]);
+                    await _bonusRepository.UpdateBatch(callbackToken, batch.Id, [release]);
+
+                    count++;
+                    //processed.Clear();
+                    //lastUpdateTime = DateTime.UtcNow;
+
                 }
 
                 // Final flush if any remain
-                if (processed.Count > 0)
-                {
-                    await _bonusRepository.UpdateBatch(callbackToken, batch.Id, processed.ToArray());
-                    _progressStatusManager.UpdateProgressStatus(processed);
-                }
+                //if (processed.Count > 0)
+                //{
+                //    await _bonusRepository.UpdateBatch(callbackToken, batch.Id, processed.ToArray());
+                //    _progressStatusManager.UpdateProgressStatus(processed);
+                //}
 
                 _progressStatusManager.UpdateUpdateCount(batch.Id, (total, total));
             }
             catch (Exception ex)
             {
                 _progressStatusManager.SetLastErrorMessage(ex.Message);
+            }
+            finally            {
+                _progressStatusManager.SetLastErrorMessage("Batch Completed");
             }
         }
 
